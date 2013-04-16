@@ -60,6 +60,10 @@ fn cb(request: &Request) -> Response{
 }
 
 fn main(){
-    let server = Server{port:8080, bind: ip::v4::parse_addr("127.0.0.1")};
+    let port = match os::getenv("PORT"){
+        Some(s) => match int::from_str(s) { Some(s) => s, None => fail!() },
+        None => fail!()
+    };
+    let server = Server{port: port, bind: ip::v4::parse_addr("127.0.0.1")};
     server.run(cb);
 }
