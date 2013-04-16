@@ -50,13 +50,16 @@ pub struct HTTPHeader{
 
 impl Request {
  
-    pub fn get(socket: &tcp::TcpSocket) -> ParseResult<Request>{
+    pub fn get(socket: &tcp::TcpSocket) -> Option<Request>{
         let request = socket.read(0u);
         if request.is_err(){
-            fail!(~"Bad connection!");
+            return None
         }
         let request = str::from_bytes(request.get());
-        parseRequest(request, &socket.get_peer_addr())
+        match parseRequest(request, &socket.get_peer_addr()) {
+            ParseSuccess(val) => Some(val),
+            ParseFailure(_) => None
+        }
     }
 
 }
@@ -126,7 +129,6 @@ pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
                             return_status: 200})
         },   
         _ => {
-            debug!("Bad HTTP request %?", words);
             ParseFailure(ParseError{line:0,return_status:400})
         }
     }
@@ -135,9 +137,6 @@ pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
 priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
     let mut lines = ~[];
     for str::each_line_any(request)|line|{lines.push(line)}
-    debug!("%?",lines)
-
-    
 
     let httpHeader = match parseHTTPHeader(lines.remove(0)) {
         ParseFailure(error)   => return ParseFailure(error),
@@ -175,7 +174,7 @@ fn vaild_header_qaulified_path()
             assert!(header.return_status == 200);
             assert!(header.http_version == (1,1));
             assert!(match header.method {
-                GET => true,
+                GET => true
             });
         }
     }
@@ -192,7 +191,7 @@ fn vaild_header_path()
             assert!(header.return_status == 200);
             assert!(header.http_version == (1,1));
             assert!(match header.method {
-                GET => true,
+                GET => true
             });
         }
     }

@@ -40,7 +40,7 @@ impl StatusCode {
             501 => ~"Not Implemented",
             502 => ~"Bad Gateway",
             503 => ~"Service Unavailable",
-            504 => ~"Gateway Timeout"
+            504 => ~"Gateway Timeout",
             505 => ~"HTTP Version Not Supported",
             _   => {fail!(fmt!("No message avalibe for error code %?", self));}
         }
