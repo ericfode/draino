@@ -64,6 +64,7 @@ fn main(){
         Some(s) => match int::from_str(s) { Some(s) => s, None => fail!() },
         None => fail!()
     };
-    let server = Server{port: port, bind: ip::v4::parse_addr("127.0.0.1")};
+    io::println(fmt!("port: %?", port));
+    let server = Server{port: port, bind: ip::v4::parse_addr("localhost")};
     server.run(cb);
 }
