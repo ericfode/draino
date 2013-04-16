@@ -1,5 +1,8 @@
+extern mod std;
+
+
 use std::net::{tcp,ip};
-use hashmap = core::hashmap::linear;
+use core::hashmap::linear::LinearMap;
 use method::Method;
 mod method;
 
@@ -15,104 +18,216 @@ mod method;
  **/
 
  pub struct Request {
-    host: ip:IpAddr,
-    headers: hashmap::LinearMap<~str,~str>,
+    host: ip::IpAddr,
+    headers: LinearMap<~str,~str>,
     method: Method,
     request_uri: ~str, 
     message_body: ~str,
     close_connection: bool,
     http_version: (int, int),
-    vaild: bool
     return_status: int 
  }
 
- impl Request {
+priv enum ParseResult<T>{
+    ParseFailure(ParseError),
+    ParseSuccess(T)
+}
 
-    priv fn parseRequest(request: ~str,ip: &IpAddr){
+priv struct ParseError{
+    line: int,
+    return_status: int
+}
 
-        let mut lines = ~[];
-        for str::each_line_any(request)|line|{lines.push(line)}
-        debug!("%?",lines)
-        let mut words = ~[];
-        for str::each_word(lines.remove(0)) |word| {words.push(word)}
+//Should probably be an emun that has this and a failure structure as options
+pub struct HTTPHeader{
+    method: Method,
+    request_uri: ~str,
+    close_connection: bool,
+    http_version: (int,int),
+    valid: bool,
+    return_status: int
+}
 
-        //REQUEST: METHOD SP REQUEST_URI SP 'HTTP/' VERSION 
-        let (command, request_uri, close_connection,http_version,vaild,return_status) = match words.len() {
-            //Version Number
-            3 => {
-                //get http version string
-                let http_version_string = words[2]
-                let valid = true
-                let return_status = 200
-
-                //slice ident
-                if http_version_string.slice(0,5) != "HTTP/" {
-                    valid = false    
-                    return_status = 400
-                    debug!("%?",http_version)
-                    ("","",false,(1,1),false,400)
-                }
-                
-                let base_version_number_string = http_version_string.slice(5,http_version.len());
-                let mut version_number = ~[]
-                for str::each_split_char(base_version_number_string, '.') |num|{version_number.push(num)}
-                if version_number.len() != 2 {
-                    vaild = false
-                    return_status = 400
-                    ("","",false,(1,1),false,400)
-                }
-
-                let http_version = (
-                    int::from_str(version_number[0]).unwrap(),
-                    int::from_str(version_number[0]).unwrap());
-
-                let close_connection = if version_number >= (1,1) {false} else {true};
-                (words[0], words[1], close_connection, http_version, valid, return_status)
-            },   
-            _ => {
-                debug!("Bad HTTP request %?", words))
-                ("","",false,(1,1),false,400)
-            }
-        }
-
-        let mut headers = hashmap::LinearMap::new::<~str,~str>();
-
-        loop {
-            let line = lines.remove(0);
-            //look for terminateing line
-            if (line == ~"\r\n") | (line == ~"\n") | (line == ~"") {break;}
-            // HEADER : HEADERNAME ':' SP HEADERVALUE 
-            match str::find_char(line, ':'){
-                Some(pos) => {headers.insert(line.slice(0,pos).to_owned), line.slice(pos+2, line.len()).to_owned());},
-                None      => {break;}
-            }
-        }
-
-        let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
-            ~"close" => true,
-            ~"keep-alive" => false,
-            _ => close_connection
-        }
-
-        Request{
-            host: ip
-            headers: headers
-            method: method,
-            request_uri: request_uri.to_owned(), 
-            message_body: str::connect_slices(lines,"\r\n"),
-            close_connection: close_connection,
-            http_version: http_version,
-            vaild: vaild
-            return_status: return_status}
-    } 
-
-    pub fn get(socket: &tcp::TcpSocket) -> Request{
+impl Request {
+ 
+    pub fn get(socket: &tcp::TcpSocket) -> ParseResult<Request>{
         let request = socket.read(0u);
         if request.is_err(){
             fail!(~"Bad connection!");
         }
         let request = str::from_bytes(request.get());
-        parseRequest(request, socket.get_peer_addr())
+        parseRequest(request, &socket.get_peer_addr())
     }
 
- }
+}
+
+// HEADER : HEADERNAME ':' SP HEADERVALUE 
+pub fn parseHeaders(request: &str) -> LinearMap<~str,~str>{    
+    let mut headers = LinearMap::new();
+    str::each_line_any(request, |line | {
+        match str::find_char(line, ':'){
+            Some(pos) => {
+                headers.insert(line.slice(0,pos).to_owned(), line.slice(pos+2, line.len()).to_owned() )
+            },
+            None      => {
+                if (line == ~"\r\n") | (line == ~"\n") | (line == ~"") {
+                    false
+                } else {
+                    true
+                }         
+            }
+        }
+    });
+    headers
+}
+
+//REQUEST: METHOD SP REQUEST_URI SP 'HTTP/' VERSION 
+pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
+    let mut words = ~[];
+    for str::each_word(HTTPHeaderStr) |word| {words.push(word)}
+    match words.len() {
+        //Version Number
+        3 => {
+            //get http version string
+            let http_version_string = words[2];
+
+            if http_version_string.slice(0,5) != "HTTP/" {
+                return ParseFailure(ParseError{line:0,return_status:400});
+            }
+            
+            let base_version_number_string = http_version_string.slice(5,http_version_string.len());
+            
+            let mut version_number = ~[];
+            for str::each_split_char(base_version_number_string, '.') |num| {version_number.push(num)}
+            
+            if version_number.len() != 2 {
+                return ParseFailure(ParseError{line:0,return_status:400})
+            }
+
+            let http_version = (
+                int::from_str(version_number[0]).unwrap(),
+                int::from_str(version_number[1]).unwrap());
+
+            if http_version < (1,1){
+                return ParseFailure(ParseError{line:0,return_status:505})
+            }
+
+            let m = match Method::from_str(words[0]) {
+                Some(val) => val,
+                None      => return ParseFailure(ParseError{line:0, return_status:405})
+            };
+
+            ParseSuccess(HTTPHeader {
+                            method: m,
+                            request_uri: words[1].to_owned(), 
+                            close_connection: false, 
+                            http_version: http_version, 
+                            valid: true,
+                            return_status: 200})
+        },   
+        _ => {
+            debug!("Bad HTTP request %?", words);
+            ParseFailure(ParseError{line:0,return_status:400})
+        }
+    }
+}
+
+priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
+    let mut lines = ~[];
+    for str::each_line_any(request)|line|{lines.push(line)}
+    debug!("%?",lines)
+
+    
+
+    let httpHeader = match parseHTTPHeader(lines.remove(0)) {
+        ParseFailure(error)   => return ParseFailure(error),
+        ParseSuccess(header)  => header 
+    };
+
+    let headers = parseHeaders(request);
+    lines.remove(headers.len());
+    //TODO: This should probably have some default configuration
+    let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
+        ~"close" => true,
+        ~"keep-alive" => false,
+        _ => false
+    };
+
+   ParseSuccess(Request{
+        host: *ip,
+        method: httpHeader.method,
+        request_uri: httpHeader.request_uri.to_owned(), 
+        return_status: httpHeader.return_status,
+        http_version: httpHeader.http_version,
+        headers: headers,
+        message_body: str::connect_slices(lines,"\r\n"),
+        close_connection: close_connection,
+       })
+} 
+
+#[test]
+fn vaild_header_qaulified_path()
+{
+    match parseHTTPHeader("GET /test/test.html HTTP/1.1"){
+        ParseFailure(_) => fail!(~"Parse failed"),
+        ParseSuccess(header) => {
+            assert!(header.request_uri == ~"/test/test.html");
+            assert!(header.return_status == 200);
+            assert!(header.http_version == (1,1));
+            assert!(match header.method {
+                GET => true,
+            });
+        }
+    }
+}
+
+
+#[test]
+fn vaild_header_path()
+{
+    match parseHTTPHeader("GET /test/test HTTP/1.1"){
+        ParseFailure(_) => fail!(~"Parse failed"),
+        ParseSuccess(header) => {
+            assert!(header.request_uri == ~"/test/test");
+            assert!(header.return_status == 200);
+            assert!(header.http_version == (1,1));
+            assert!(match header.method {
+                GET => true,
+            });
+        }
+    }
+}
+
+#[test]
+fn bad_http_version()
+{
+    match parseHTTPHeader("GET /test/test HTTP/1.0"){
+        ParseFailure(error) => assert!(error.return_status == 505),
+        ParseSuccess(_) => fail!(~"ignored")
+    }
+}
+
+#[test]
+fn invalid_method()
+{
+    match parseHTTPHeader("GARBAGE /test/test HTTP/1.1"){
+        ParseFailure(error) => {assert!(error.return_status == 405)},
+        ParseSuccess(_) => fail!(~"ignored")
+    }   
+}
+
+#[test]
+fn headers_some()
+{
+    let val =  parseHeaders("GET /test/test HTTP/1.1 \n\
+                           test: param\n\
+                           xss: iscool\n\
+                           all: win\n\
+                           \r\n\
+                           things: failed");
+    io::println(fmt!("%?",val));
+    assert!(val.get(&~"test") == &~"param");
+    assert!(val.get(&~"xss") == &~"iscool");
+    assert!(val.get(&~"all") == &~"win");
+    assert!(!val.contains_key(&~"things"));
+}

@@ -1,0 +1,4 @@
+*.dSYM
+*.obj
+*.exe
+*.dll

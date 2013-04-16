@@ -2,18 +2,11 @@
 pub enum Method { GET, HEAD, POST, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATCH}
 
 impl Method {
-    pub fn from_str(method: &str) -> Method {
+    pub fn from_str(method: &str) -> Option<Method> {
         match method {
-            "GET"    => GET,
-            "HEAD"   => HEAD,
-            "POST"   => POST,
-            "PUT"    => PUT,
-            "DELETE" => DELETE,
-            "TRACE"  => TRACE,
-            "OPTIONS"=> OPTIONS,
-            "CONNECT"=> CONNECT,
-            "PATCH"  => PATCH,
-            _        => {fail!(fmt!("Bad HTTP method: %?",method))}
+            "GET"    => Some(GET),
+            "HEAD"   => Some(HEAD),
+             _        => None
         }
     }
 
