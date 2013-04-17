@@ -28,12 +28,12 @@ impl Server {
                             kill_ch.send(Some(err));
                             fail!();
                         },
-                        result::Ok(socket) => @socket
+                        result::Ok(socket) => ~socket
                     };
                     loop {
                         match Request::get(socket){
                             Some(request) => {
-                                let response = @callback(&request);
+                                let response = ~callback(&request);
                                 
                                 socket.write(response.to_bytes());
                                 if request.close_connection == true{
@@ -41,7 +41,7 @@ impl Server {
                                 }
                                 task::yield();
                             },
-                            None => {task::yield();}
+                            None => {task::yield(); break;}
                         }
                     }
                 }
