@@ -56,7 +56,7 @@ impl Request {
             return None
         }
         let request = str::from_bytes(request.get());
-        io::println("%s", request)
+        io::println("%s", request);
         match parseRequest(request, &socket.get_peer_addr()) {
             ParseSuccess(val) => Some(val),
             ParseFailure(_) => None
