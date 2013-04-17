@@ -20,7 +20,7 @@ pub struct Server{
 
 impl Server {
     pub fn run(&self,callback:extern fn(&Request) -> Response) -> result::Result<(), tcp::TcpListenErrData>{
-        tcp::listen(self.bind, self.port as uint, 100, &uv::global_loop::get(), |_| {},
+        tcp::listen(self.bind, self.port as uint, 1000, &uv::global_loop::get(), |_| {},
             |new_conn, kill_ch|{
                 do task::spawn_supervised{
                     let socket = match tcp::accept(new_conn) {
@@ -28,12 +28,12 @@ impl Server {
                             kill_ch.send(Some(err));
                             fail!();
                         },
-                        result::Ok(socket) => ~socket
+                        result::Ok(socket) => @socket
                     };
                     loop {
                         match Request::get(socket){
                             Some(request) => {
-                                let response = ~callback(&request);
+                                let response = @callback(&request);
                                 
                                 socket.write(response.to_bytes());
                                 if request.close_connection == true{
@@ -41,7 +41,7 @@ impl Server {
                                 }
                                 task::yield();
                             },
-                            None => {task::yield(); break;}
+                            None => {task::yield();break;}
                         }
                     }
                 }
@@ -65,6 +65,6 @@ fn main(){
         None => fail!()
     };
     io::println(fmt!("port: %?", port));
-    let server = Server{port: port, bind: ip::v4::parse_addr("0.0.0.0")};
+    let server = Server{port: port, bind: ip::v4::parse_addr("127.0.0.1")};
     server.run(cb);
 }

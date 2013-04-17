@@ -26,6 +26,10 @@ impl Response{
         for self.headers.each_key()|key| {
            header_strs.push(fmt!("%s: %s\r\n", *key,*self.headers.get(key)));
         }
+        match self.headers.find(&~"Content-Type") {
+            None => {header_strs.push(fmt!("Content-Type: text/html"))}
+            _ => {}
+        }
         header_strs.push(fmt!("Content-Length: %u\r\n",self.body.len()));
         str::concat(vec::concat([~[status_line],header_strs,~[~"\r\n"],~[self.body.to_owned()]]))
     }
