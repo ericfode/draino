@@ -65,6 +65,6 @@ fn main(){
         None => fail!()
     };
     io::println(fmt!("port: %?", port));
-    let server = Server{port: port, bind: ip::v4::parse_addr("127.0.0.1")};
+    let server = Server{port: port, bind: ip::v4::parse_addr("0.0.0.0")};
     server.run(cb);
 }
