@@ -146,22 +146,23 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
         ParseFailure(error)   => return ParseFailure(error),
         ParseSuccess(header)  => header 
     };
-
-    let headers = parseHeaders(request);
-    lines.remove(headers.len());
-    //TODO: This should probably have some default configuration
-    let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
+    if (lines.len() > 1){
+      let headers = parseheaders(request);
+      lines.remove(headers.len());
+    }
+    //todo: this should probably have some default configuration
+    let close_connection = match headers.find(&~"connection").unwrap().to_lower(){
         ~"close" => true,
         ~"keep-alive" => false,
         _ => false
     };
 
-   ParseSuccess(Request{
+   parsesuccess(request{
         host: *ip,
-        method: httpHeader.method,
-        request_uri: httpHeader.request_uri.to_owned(), 
-        return_status: httpHeader.return_status,
-        http_version: httpHeader.http_version,
+        method: httpheader.method,
+        request_uri: httpheader.request_uri.to_owned(), 
+        return_status: httpheader.return_status,
+        http_version: httpheader.http_version,
         headers: headers,
         message_body: str::connect_slices(lines,"\r\n"),
         close_connection: close_connection,
@@ -171,14 +172,14 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
 #[test]
 fn vaild_header_qaulified_path()
 {
-    match parseHTTPHeader("GET /test/test.html HTTP/1.1"){
-        ParseFailure(_) => fail!(~"Parse failed"),
-        ParseSuccess(header) => {
+    match parsehttpheader("get /test/test.html http/1.1"){
+        parsefailure(_) => fail!(~"parse failed"),
+        parsesuccess(header) => {
             assert!(header.request_uri == ~"/test/test.html");
             assert!(header.return_status == 200);
             assert!(header.http_version == (1,1));
             assert!(match header.method {
-                GET => true
+                get => true
             });
         }
     }
@@ -188,14 +189,14 @@ fn vaild_header_qaulified_path()
 #[test]
 fn vaild_header_path()
 {
-    match parseHTTPHeader("GET /test/test HTTP/1.1"){
-        ParseFailure(_) => fail!(~"Parse failed"),
-        ParseSuccess(header) => {
+    match parsehttpheader("get /test/test http/1.1"){
+        parsefailure(_) => fail!(~"parse failed"),
+        parsesuccess(header) => {
             assert!(header.request_uri == ~"/test/test");
             assert!(header.return_status == 200);
             assert!(header.http_version == (1,1));
             assert!(match header.method {
-                GET => true
+                get => true
             });
         }
     }
@@ -204,18 +205,18 @@ fn vaild_header_path()
 #[test]
 fn bad_http_version()
 {
-    match parseHTTPHeader("GET /test/test HTTP/1.0"){
-        ParseFailure(error) => assert!(error.return_status == 505),
-        ParseSuccess(_) => fail!(~"ignored")
+    match parsehttpheader("get /test/test http/1.0"){
+        parsefailure(error) => assert!(error.return_status == 505),
+        parsesuccess(_) => fail!(~"ignored")
     }
 }
 
 #[test]
 fn invalid_method()
 {
-    match parseHTTPHeader("GARBAGE /test/test HTTP/1.1"){
-        ParseFailure(error) => {assert!(error.return_status == 405)},
-        ParseSuccess(_) => fail!(~"ignored")
+    match parsehttpheader("garbage /test/test http/1.1"){
+        parsefailure(error) => {assert!(error.return_status == 405)},
+        parsesuccess(_) => fail!(~"ignored")
     }   
 }
 
