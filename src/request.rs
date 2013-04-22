@@ -67,10 +67,10 @@ impl Request {
 
 // HEADER : HEADERNAME ':' SP HEADERVALUE 
 pub fn parseHeaders(request: &str) -> LinearMap<~str,~str>{  
-
+  io:println(fmt!("str: %?", request))
   if request == "\r\n"{
         return LinearMap::new(); 
-    }  
+  }  
     let mut headers = LinearMap::new();
     str::each_line_any(request, |line | {
         match str::find_char(line, ':'){
