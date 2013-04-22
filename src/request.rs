@@ -67,7 +67,7 @@ impl Request {
 
 // HEADER : HEADERNAME ':' SP HEADERVALUE 
 pub fn parseHeaders(request: &str) -> LinearMap<~str,~str>{  
-    if request == "\r\n\r\n"{
+    if request == "\r\n"{
         return LinearMap::new(); 
     }  
     let mut headers = LinearMap::new();
@@ -233,4 +233,10 @@ fn headers_some()
     assert!(val.get(&~"xss") == &~"iscool");
     assert!(val.get(&~"all") == &~"win");
     assert!(!val.contains_key(&~"things"));
+}
+
+#[test]
+fn headers_none()
+{
+  let val = parseHeaders("\r\n");
 }
