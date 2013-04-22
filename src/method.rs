@@ -6,8 +6,16 @@ impl Method {
         match method {
             "GET"    => Some(GET),
             "HEAD"   => Some(HEAD),
-             _        => None
+            "POST"   => Some(POST),
+            "PUT"    => Some(PUT),
+            "DELETE" => Some(DELETE),
+            "TRACE"  => Some(TRACE),
+            "OPTIONS"=> Some(OPTIONS),
+            "CONNECT"=> Some(CONNECT),
+            "PATCH"  => Some(PATCH),
+             _       => None
         }
     }
+
 
 }
