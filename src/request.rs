@@ -67,7 +67,7 @@ impl Request {
 
 // HEADER : HEADERNAME ':' SP HEADERVALUE 
 pub fn parseHeaders(request: &str) -> LinearMap<~str,~str>{  
-  io::println(fmt!("str: %?", request))
+  io::println(fmt!("str: %?", request));
   if request == "\r\n"{
         return LinearMap::new(); 
   }  
