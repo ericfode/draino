@@ -149,7 +149,9 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
     };
     io::println(fmt!("lines: %?", lines)); 
     let headers = parseHeaders(lines);
-    lines.remove(headers.len());
+    if (headers.len() > 0) {
+      lines.remove(headers.len() - 1);
+    }
     //TODO: This should probably have some default configuration
     let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
         ~"close" => true,
