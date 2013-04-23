@@ -51,13 +51,20 @@ pub struct HTTPHeader{
 impl Request {
  
     pub fn get(socket: &tcp::TcpSocket) -> Option<Request>{
-        let request = socket.read(0u);
-        if request.is_err(){
-            return None
-        }
-        let request = str::from_bytes(request.get());
-        io::println(fmt!("%?",request));
-        match parseRequest(request, &socket.get_peer_addr()) {
+        let mut req: ~str = ~"";
+          loop {
+            let result = socket.read(0u);
+            if result.is_err() {
+                return None
+            }
+      
+            req += str::from_bytes(result.get());
+            if str::contains(req, "\r\n\r\n") {
+              break;
+            }
+          }
+        io::println(fmt!("%?",req));
+        match parseRequest(req, &socket.get_peer_addr()) {
             ParseSuccess(val) => Some(val),
             ParseFailure(_) => None
         }
