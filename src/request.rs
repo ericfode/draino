@@ -66,19 +66,16 @@ impl Request {
 }
 
 // HEADER : HEADERNAME ':' SP HEADERVALUE 
-pub fn parseHeaders(request: &str) -> LinearMap<~str,~str>{  
-  io::println(fmt!("str: %?", request));
-  if request == "\r\n"{
-        return LinearMap::new(); 
-  }  
+pub fn parseHeaders(requestLines: &[&str]) -> LinearMap<~str,~str>{  
     let mut headers = LinearMap::new();
-    str::each_line_any(request, |line | {
-        match str::find_char(line, ':'){
+    requestLines.each( |line| {
+        io::println(fmt!("str: %?", *line));
+        match str::find_char(*line, ':'){
             Some(pos) => {
                 headers.insert(line.slice(0,pos).to_owned(), line.slice(pos+2, line.len()).to_owned() )
             },
             None      => {
-                if (line == ~"\r\n") | (line == ~"\n") | (line == ~"") {
+                if (*line == ~"\r\n") | (*line == ~"\n") | (*line == ~"") {
                     false
                 } else {
                     true
@@ -147,8 +144,8 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
         ParseFailure(error)   => return ParseFailure(error),
         ParseSuccess(header)  => header 
     };
-
-    let headers = parseHeaders(request);
+    
+    let headers = parseHeaders(lines);
     lines.remove(headers.len());
     //TODO: This should probably have some default configuration
     let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
@@ -223,12 +220,15 @@ fn invalid_method()
 #[test]
 fn headers_some()
 {
-    let val =  parseHeaders("GET /test/test HTTP/1.1 \n\
-                           test: param\n\
-                           xss: iscool\n\
-                           all: win\n\
-                           \r\n\
-                           things: failed");
+    let myStr ="test: param\n\
+                       xss: iscool\n\
+                       all: win\n\
+                       \r\n\
+                       things: failed";
+    let mut words = ~[];
+    for str::each_line_any(myStr) |word| {words.push(word)}
+ 
+    let val =  parseHeaders(words);
     io::println(fmt!("%?",val));
     assert!(val.get(&~"test") == &~"param");
     assert!(val.get(&~"xss") == &~"iscool");
@@ -239,5 +239,8 @@ fn headers_some()
 #[test]
 fn headers_none()
 {
-  let val = parseHeaders("\r\n");
+  let myStr = "\r\n";
+  let mut words = ~[];
+  for str::each_line_any(myStr) |word| {words.push(word)}
+  let val = parseHeaders(words);
 }
