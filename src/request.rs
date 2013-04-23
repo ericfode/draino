@@ -147,7 +147,7 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
         ParseFailure(error)   => return ParseFailure(error),
         ParseSuccess(header)  => header 
     };
-    
+    io::println(fmt!("lines: %?", lines)); 
     let headers = parseHeaders(lines);
     lines.remove(headers.len());
     //TODO: This should probably have some default configuration
@@ -245,3 +245,5 @@ fn headers_none()
   let mut words = ~[];
   let val = parseHeaders(words);
 }
+
+
