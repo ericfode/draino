@@ -149,7 +149,7 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
     };
     io::println(fmt!("lines: %?", lines)); 
     let headers = parseHeaders(lines);
-    let mut close_connection =false
+    let mut close_connection =false;
     if (headers.len() > 0) {
       lines.remove(headers.len() - 1);
       let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
