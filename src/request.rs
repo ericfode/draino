@@ -135,7 +135,7 @@ pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
             ParseSuccess(HTTPHeader {
                             method: m,
                             request_uri: words[1].to_owned(), 
-                            close_connection: false, 
+                            close_connection: true, 
                             http_version: http_version, 
                             valid: true,
                             return_status: 200})
@@ -159,7 +159,7 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
     let mut close_connection =false;
     if (headers.len() > 0) {
       lines.remove(headers.len() - 1);
-      let close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
+      close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
         ~"close" => true,
         ~"keep-alive" => false,
         _ => false
