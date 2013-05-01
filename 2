@@ -1,6 +1,6 @@
 extern mod std;
 
-use std::int;
+
 use std::net::{tcp,ip};
 use core::hashmap::linear::LinearMap;
 use method::Method;
@@ -16,6 +16,17 @@ mod method;
  * * Message-Body (message-body)
  *
  **/
+mod Request {
+ pub struct Request {
+    host: ip::IpAddr,
+    headers: LinearMap<~str,~str>,
+    method: Method,
+    request_uri: ~str, 
+    message_body: ~[u8],
+    close_connection: bool,
+    http_version: (int, int),
+    return_status: int 
+ }
 
 priv enum ParseResult<T>{
     ParseFailure(ParseError),
@@ -37,42 +48,27 @@ pub struct HTTPHeader{
     return_status: int
 }
 
-pub struct Request {
-    host: ip::IpAddr,
-    headers: LinearMap<~str,~str>,
-    method: Method,
-    request_uri: ~str, 
-    message_body: Option<~[u8]>,
-    body_length: uint,
-    close_connection: bool,
-    http_version: (int, int),
-    return_status: int 
-}
-
-
-impl Request {
-
-  pub fn create_request<T : io::ReaderUtil>(reader: &T, addr: &ip::IpAddr) -> Option<Request>{
+pub fn create_request(socket: tcp::TcpSocket) -> Option<Request>{
+  let reader = tcp::socket_buf(socket) as io::ReaderUtil;
   let headerStr = getHeaderStr(reader);
   io::println(fmt!("%?",headerStr));
-  if (headerStr == ~"") {
-    return None;
-  }
-  let mut request = match parseRequest(headerStr, addr) {
+  let request = match parseRequest(headerStr, &socket.get_peer_addr()) {
       ParseSuccess(val) => val,
-      ParseFailure(_) =>  return None,
+      ParseFailure(_) => return None
   };
 
-  request.message_body = Some(reader.read_bytes(request.body_length));
-  return Some(request)
+  request.message_body = reader.read_chars(request.body_length);
+  if request.close_connection {
+    socket.close()
   }
 }
+}
 
-priv fn getHeaderStr<T : io::ReaderUtil>(reader: &T) -> ~str{
+priv fn getHeaderStr(reader: &io::ReaderUtil) -> ~str{
   let mut req: ~str = ~"";  
   loop {
-    req += reader.read_until('\n',true);
-    if str::contains(req, "\r\n\r\n") || req == ~""{
+    req += reader.read_line();
+    if str::contains(req, "\r\n\r\n") {
       return req;
     }
   }
@@ -173,14 +169,12 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
         ~"keep-alive" => false,
         _ => false
       };
-      body_length = match headers.find(&~"Content-Length"){
-        Some(val) =>  match uint::from_str(*val) {
-              Some(val) => val,
-              None()    => 0
-            },
-        None()    => 0
+      body_length = match headers.find(&~"Content-Length").unwrap().to_lower(){
+        Some(val) => val,
+        _         => 0
       };
-    } 
+    }
+    
     //TODO: NEED to get message body size.
    ParseSuccess(Request{
         host: *ip,
@@ -189,8 +183,8 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
         return_status: httpHeader.return_status,
         http_version: httpHeader.http_version,
         headers: headers,
-        body_length: body_length,
-        message_body: None,
+        body_lengh: body_length,
+        message_body: str::connect_slices(lines,"\r\n"),
         close_connection: close_connection,
        })
 } 

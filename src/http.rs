@@ -28,20 +28,26 @@ impl Server {
                             kill_ch.send(Some(err));
                             fail!();
                         },
-                        result::Ok(socket) => @socket
+                        result::Ok(socket) => socket
                     };
-                    loop {
-                        match Request::get(socket){
+                    
+                      let ip = socket.get_peer_addr(); 
+                      let buf = tcp::socket_buf(socket); 
+                      loop {
+                        io::println("parsing request");
+                        match Request::create_request(&buf,&ip){
                             Some(request) => {
-                                let response = @callback(&request);
-                                
-                                socket.write(response.to_bytes());
+                                io::println("responding");
+                                let response = callback(&request);
+                                 
+                                buf.write(response.to_bytes());
+                                buf.flush();
                                 if request.close_connection == true{
                                     break;
                                 }
                                 task::yield();
                             },
-                            None => {task::yield();break;}
+                            None => {io::println("error or boring keepalive"); break;}
                         }
                     }
                 }
@@ -62,9 +68,9 @@ fn cb(request: &Request) -> Response{
 fn main(){
     let port = match os::getenv("PORT"){
         Some(s) => match int::from_str(s) { Some(s) => s, None => fail!() },
-        None => fail!()
+        None => fail!(~"no ports man")
     };
     io::println(fmt!("port: %?", port));
-    let server = Server{port: port, bind: ip::v4::parse_addr("0.0.0.0")};
+    let server = Server{port: port, bind: ip::v4::parse_addr("127.0.0.1")};
     server.run(cb);
 }
