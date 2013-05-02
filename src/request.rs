@@ -17,12 +17,12 @@ mod method;
  *
  **/
 
-priv enum ParseResult<T>{
+pub enum ParseResult<T>{
     ParseFailure(ParseError),
+    ParseEmpty,
     ParseSuccess(T)
 }
-
-priv struct ParseError{
+pub struct ParseError{
     line: int,
     return_status: int
 }
@@ -52,19 +52,21 @@ pub struct Request {
 
 impl Request {
 
-  pub fn create_request<T : io::ReaderUtil>(reader: &T, addr: &ip::IpAddr) -> Option<Request>{
+  pub fn create_request<T : io::ReaderUtil>(reader: &T, addr: &ip::IpAddr) -> ParseResult<Request>{
   let headerStr = getHeaderStr(reader);
-  io::println(fmt!("%?",headerStr));
+  debug!(fmt!("%?",headerStr));
   if (headerStr == ~"") {
-    return None;
+    debug!("header seems to be empty");
+    return ParseEmpty;
   }
   let mut request = match parseRequest(headerStr, addr) {
       ParseSuccess(val) => val,
-      ParseFailure(_) =>  return None,
+      ParseFailure(error) =>  return ParseFailure(error),
+      ParseEmpty => return ParseEmpty
   };
 
   request.message_body = Some(reader.read_bytes(request.body_length));
-  return Some(request)
+  return ParseSuccess(request)
   }
 }
 
@@ -83,11 +85,12 @@ priv fn getHeaderStr<T : io::ReaderUtil>(reader: &T) -> ~str{
 // HEADER : HEADERNAME ':' SP HEADERVALUE 
 pub fn parseHeaders(requestLines: &[&str]) -> LinearMap<~str,~str>{  
   if( requestLines.len() == 0){
+    debug!("no headers found at:parseHeaders");
     return LinearMap::new();
   }  
   let mut headers = LinearMap::new();
     requestLines.each( |line| {
-        io::println(fmt!("str: %?", *line));
+        debug!(fmt!("str: %?", *line));
         match str::find_char(*line, ':'){
             Some(pos) => {
                 headers.insert(line.slice(0,pos).to_owned(), line.slice(pos+2, line.len()).to_owned() )
@@ -115,7 +118,8 @@ pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
             let http_version_string = words[2];
 
             if http_version_string.slice(0,5) != "HTTP/" {
-                return ParseFailure(ParseError{line:0,return_status:400});
+              debug!("header version string error");
+              return ParseFailure(ParseError{line:0,return_status:400});
             }
             
             let base_version_number_string = http_version_string.slice(5,http_version_string.len());
@@ -124,6 +128,7 @@ pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
             for str::each_split_char(base_version_number_string, '.') |num| {version_number.push(num)}
             
             if version_number.len() != 2 {
+                debug!("verstion error");
                 return ParseFailure(ParseError{line:0,return_status:400})
             }
 
@@ -131,7 +136,7 @@ pub fn parseHTTPHeader(HTTPHeaderStr:&str) -> ParseResult<HTTPHeader>{
                 int::from_str(version_number[0]).unwrap(),
                 int::from_str(version_number[1]).unwrap());
 
-            if http_version < (1,1){
+            if http_version < (1,0){
                 return ParseFailure(ParseError{line:0,return_status:505})
             }
 
@@ -160,19 +165,24 @@ priv fn parseRequest(request: &str,ip: &ip::IpAddr) -> ParseResult<Request>{
 
     let httpHeader = match parseHTTPHeader(lines.remove(0)) {
         ParseFailure(error)   => return ParseFailure(error),
-        ParseSuccess(header)  => header 
+        ParseSuccess(header)  => header,
+        ParseEmpty            => return ParseEmpty
     };
-    io::println(fmt!("lines: %?", lines)); 
+    debug!(fmt!("lines: %?", lines)); 
     let headers = parseHeaders(lines);
     let mut close_connection =false;
     let mut body_length = 0;
     if (headers.len() > 0) {
       lines.remove(headers.len() - 1);
-      close_connection = match headers.find(&~"Connection").unwrap().to_lower(){
-        ~"close" => true,
-        ~"keep-alive" => false,
-        _ => false
+      close_connection = match headers.find(&~"Connection") {
+        Some(val)  => {  match val.to_lower(){
+          ~"close"      => true,
+          ~"keep-alive" => false,
+          _             => false 
+        }},
+        None       => false 
       };
+
       body_length = match headers.find(&~"Content-Length"){
         Some(val) =>  match uint::from_str(*val) {
               Some(val) => val,

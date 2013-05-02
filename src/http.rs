@@ -20,7 +20,7 @@ pub struct Server{
 
 impl Server {
     pub fn run(&self,callback:extern fn(&Request) -> Response) -> result::Result<(), tcp::TcpListenErrData>{
-        tcp::listen(self.bind, self.port as uint, 1000, &uv::global_loop::get(), |_| {},
+        tcp::listen(self.bind, self.port as uint, 20, &uv::global_loop::get(), |_| {},
             |new_conn, kill_ch|{
                 do task::spawn_supervised{
                     let socket = match tcp::accept(new_conn) {
@@ -34,20 +34,29 @@ impl Server {
                       let ip = socket.get_peer_addr(); 
                       let buf = tcp::socket_buf(socket); 
                       loop {
-                        io::println("parsing request");
                         match Request::create_request(&buf,&ip){
-                            Some(request) => {
-                                io::println("responding");
-                                let response = callback(&request);
-                                 
-                                buf.write(response.to_bytes());
-                                buf.flush();
-                                if request.close_connection == true{
-                                    break;
-                                }
-                                task::yield();
-                            },
-                            None => {io::println("error or boring keepalive"); break;}
+                          request::ParseSuccess(request) => {
+                            debug!("responding");
+                            let response = callback(&request);
+                            buf.write(response.to_bytes());
+                            buf.flush();
+                            if request.close_connection == true{break;}
+                            //disable keep alive
+                            break;
+                            task::yield()
+                          },
+                          request::ParseEmpty => {
+                            io::println("keeping alive");
+                            task::yield();
+                            if buf.eof(){
+                              break;
+                            }
+                          },
+                           request::ParseFailure(err) => {
+                            io::println(fmt!("bad request: %?",err) );
+                            buf.write(bad().to_bytes());
+                            break;
+                           }  
                         }
                     }
                 }
@@ -63,6 +72,15 @@ fn cb(request: &Request) -> Response{
         status_code: StatusCode(200),
         body: ~"<h1>Hi!</h1>"
     }
+}
+
+fn bad() -> Response{
+  Response{
+    http_version: (1,1),
+    headers: hashmap::LinearMap::new::<~str,~str>(),
+    status_code: StatusCode(400),
+    body: ~""
+  }
 }
 
 fn main(){
